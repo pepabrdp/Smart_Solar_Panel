@@ -18,7 +18,6 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include<stdio.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -41,17 +40,20 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-ADC_HandleTypeDef hadc1;
-
+UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-
+uint8_t rxData;
+//uint8_t data[100] = "Total Power(W) output : 5000W // Current Voltage(Volts) output : 2 Volts // Current current : 47 Amps ";
+uint8_t readData[11] = "Read Data!";
+uint8_t eventMsg[16] = "Movement Logic!";
+uint8_t count =0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_ADC1_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -89,27 +91,30 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_ADC1_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+  HAL_UART_Receive_IT(&huart1,&rxData,1); // Enabling interrupt receive
+  TIM5_Init(); //Set up the timer for the "Data Read" part
+  TIM5_Interrupt_Init(); //Set up the interrupt for it
+  TIM5_Enable(); //Enable the timer
 
+  EventInterrupt_Init(); //Initialize the event interrupt, correspond to the "Panel Movement" part of the project
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  unsigned int analog_value;
   while (1)
   {
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  HAL_ADC_Start(&hadc1);
-	  if(HAL_ADC_PollForConversion(&hadc1, 10) == HAL_OK)
+	  /*
+	  count++;
+	  if ((count%20) == 0)
 	  {
-		  analog_value = HAL_ADC_GetValue(&hadc1);
+		  HAL_UART_Transmit_IT(&huart1, data, sizeof (data));
 	  }
-	  HAL_ADC_Stop(&hadc1);
-	  HAL_Delay(50);
+	  */
   }
   /* USER CODE END 3 */
 }
@@ -125,18 +130,15 @@ void SystemClock_Config(void)
 
   /** Configure the main internal regulator output voltage
   */
-  if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK)
-  {
-    Error_Handler();
-  }
+  __HAL_RCC_PWR_CLK_ENABLE();
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
-  RCC_OscInitStruct.MSIState = RCC_MSI_ON;
-  RCC_OscInitStruct.MSICalibrationValue = 0;
-  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -147,7 +149,7 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_MSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
@@ -159,60 +161,35 @@ void SystemClock_Config(void)
 }
 
 /**
-  * @brief ADC1 Initialization Function
+  * @brief USART1 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_ADC1_Init(void)
+static void MX_USART1_UART_Init(void)
 {
 
-  /* USER CODE BEGIN ADC1_Init 0 */
+  /* USER CODE BEGIN USART1_Init 0 */
 
-  /* USER CODE END ADC1_Init 0 */
+  /* USER CODE END USART1_Init 0 */
 
-  ADC_ChannelConfTypeDef sConfig = {0};
+  /* USER CODE BEGIN USART1_Init 1 */
 
-  /* USER CODE BEGIN ADC1_Init 1 */
-
-  /* USER CODE END ADC1_Init 1 */
-
-  /** Common config
-  */
-  hadc1.Instance = ADC1;
-  hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
-  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
-  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
-  hadc1.Init.LowPowerAutoWait = DISABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
-  hadc1.Init.NbrOfConversion = 1;
-  hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
-  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-  hadc1.Init.DMAContinuousRequests = DISABLE;
-  hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
-  hadc1.Init.OversamplingMode = DISABLE;
-  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 9600;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
   {
     Error_Handler();
   }
+  /* USER CODE BEGIN USART1_Init 2 */
 
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_6;
-  sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
-  sConfig.SingleDiff = ADC_SINGLE_ENDED;
-  sConfig.OffsetNumber = ADC_OFFSET_NONE;
-  sConfig.Offset = 0;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN ADC1_Init 2 */
-
-  /* USER CODE END ADC1_Init 2 */
+  /* USER CODE END USART1_Init 2 */
 
 }
 
@@ -223,17 +200,119 @@ static void MX_ADC1_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 /* USER CODE BEGIN MX_GPIO_Init_1 */
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : PA5 */
+  GPIO_InitStruct.Pin = GPIO_PIN_5;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
+
+void TIM5_Init() {
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM5, ENABLE);
+    TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
+
+    TIM_TimeBaseStructure.TIM_Prescaler = 999;  // Assuming a 1 MHz clock
+    TIM_TimeBaseStructure.TIM_Period = 9999;    // 10 Hz frequency
+    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
+    TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+    TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
+
+    TIM_TimeBaseInit(TIM5, &TIM_TimeBaseStructure);
+}
+
+void TIM5_Interrupt_Init() {
+    NVIC_InitTypeDef NVIC_InitStructure;
+
+    NVIC_InitStructure.NVIC_IRQChannel = TIM5_IRQn;  // TIM5_IRQn is defined in the CMSIS file for your STM32F4 variant
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;  // Set the preemption priority as needed
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;         // Set the subpriority as needed
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+
+    NVIC_Init(&NVIC_InitStructure);
+}
+
+void TIM5_IRQHandler(void) {
+    // Your interrupt code here
+    // Clear the interrupt flag
+    if (TIM_GetITStatus(TIM5, TIM_IT_Update) != RESET) {
+        TIM_ClearITPendingBit(TIM5, TIM_IT_Update);
+        // Your code here
+        HAL_UART_Transmit_IT(&huart1, readData, sizeof (readData));
+        if (counter++ >= 5){
+        	EXTI_GenerateSWInterrupt(EXTI_Line0);
+        }
+
+    }
+}
+
+void TIM5_Enable() {
+    TIM_Cmd(TIM5, ENABLE);
+    TIM_ITConfig(TIM5, TIM_IT_Update, ENABLE);
+}
+
+void EventInterrupt_Init() {
+    EXTI_InitTypeDef EXTI_InitStructure;
+    NVIC_InitTypeDef NVIC_InitStructure;
+
+    // Configure an external interrupt source (e.g., EXTI0) for the event trigger
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+
+    EXTI_InitStructure.EXTI_Line = EXTI_Line0;
+    EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising;
+    EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+    EXTI_Init(&EXTI_InitStructure);
+
+    // Configure the NVIC for the event interrupt
+    NVIC_InitStructure.NVIC_IRQChannel = EXTI0_IRQn;  // EXTI0_IRQn is an example, use the appropriate EXTI channel
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;  // Set the preemption priority as needed
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;         // Set the subpriority as needed
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+}
+
+void EventInterruptHandler(void) {
+    // This is the event interrupt handler.
+    // You can perform actions related to the event here.
+    // For this example, we'll print a message.
+	HAL_UART_Transmit_IT(&huart1, eventMsg, sizeof (eventMsg));
+}
+
+
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	if(huart->Instance==USART1)
+	{
+		if(rxData==78) // Ascii value of 'N' is 78 (N for NO)
+		{
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 0);
+		}
+		else if (rxData==89) // Ascii value of 'Y' is 89 (Y for YES)
+			{
+				HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, 1);
+			}
+		HAL_UART_Receive_IT(&huart1,&rxData,1); // Enabling interrupt receive again
+	}
+}
+
 
 /* USER CODE END 4 */
 
