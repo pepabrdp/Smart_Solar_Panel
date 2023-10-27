@@ -16,6 +16,7 @@ void  hardIronCal(float* xCal, float* yCal, float* zCal);
 float getDirectionAngle(int16_t xMag, int16_t yMag, int16_t zMag, float xCal, float yCal, float zCal);
 void printDirection(float D);
 void setupMag();
+float magnetometerData(float xCal,float yCal,float zCal);
 
 //Device Address
 uint8_t magAddress = 0x1E;
@@ -39,16 +40,11 @@ int main(void)
   MX_I2C1_Init();
   MX_USART2_UART_Init();
 
-  setupMag();
-
-//  uint8_t buf[10];
-
-  //Calibration Values
   float xCal, yCal, zCal;
   xCal = 0;
   yCal = 0;
   zCal = 0;
-
+  setupMag();
   hardIronCal(&xCal, &yCal, &zCal);
 
   //Direction Angle
@@ -56,23 +52,30 @@ int main(void)
 
   while (1)
   {
-	  int16_t magnetometerVal [3] = {0};
-
-	  while (HAL_I2C_Master_Transmit(&hi2c1, (magAddress << 1), &dataRegister, 1, 20) != HAL_OK){} //send data register address
-	  while (HAL_I2C_Master_Receive(&hi2c1, (magAddress << 1 | 1), magnetometerVal, 6, HAL_MAX_DELAY)){}
-
-	  int16_t xMag = magnetometerVal[0];
-
-	  int16_t yMag = magnetometerVal[1];
-
-	  int16_t zMag = magnetometerVal[2];
-
-	  direction = getDirectionAngle(xMag, yMag, zMag, xCal, yCal, zCal);
-	  printDirection(direction);
-
-	  HAL_Delay(1000);
+	  direction = magnetometerData(xCal, yCal, zCal);
   }
 }
+
+float magnetometerData(float xCal,float yCal,float zCal) {
+	int16_t magnetometerVal [3] = {0};
+
+	while (HAL_I2C_Master_Transmit(&hi2c1, (magAddress << 1), &dataRegister, 1, 20) != HAL_OK){} //send data register address
+	while (HAL_I2C_Master_Receive(&hi2c1, (magAddress << 1 | 1), magnetometerVal, 6, HAL_MAX_DELAY)){}
+
+	int16_t xMag = magnetometerVal[0];
+
+	int16_t yMag = magnetometerVal[1];
+
+	int16_t zMag = magnetometerVal[2];
+
+	float direction = getDirectionAngle(xMag, yMag, zMag, xCal, yCal, zCal);
+	printDirection(direction);
+
+	HAL_Delay(1000);
+
+	return direction;
+}
+
 
 void setupMag() {
 //	uint8_t magAddress = 0x1E;
@@ -228,7 +231,7 @@ float getDirectionAngle(int16_t xMag, int16_t yMag, int16_t zMag, float xCal, fl
   }
 
   uint8_t buf[20];
-  sprintf((char*)buf, "D = %u%u \r\n", (unsigned int)D / 100, (unsigned int)D % 100);
+  sprintf((char*)buf, "D = %u \r\n", (unsigned int)D);
   HAL_UART_Transmit(&huart2, buf, strlen((char*)buf), HAL_MAX_DELAY);
 
   return D;
