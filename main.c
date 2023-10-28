@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -40,22 +40,38 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+//TIM_HandleTypeDef htim5;
+TIM_HandleTypeDef htim11;
+
 UART_HandleTypeDef huart1;
+UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+TIM_HandleTypeDef htim5;
 uint8_t rxData;
-//uint8_t data[100] = "Total Power(W) output : 5000W // Current Voltage(Volts) output : 2 Volts // Current current : 47 Amps ";
+uint8_t data[15] = "Main Function";
+uint8_t interrupt[10] = "Interrupt";
 uint8_t readData[11] = "Read Data!";
 uint8_t eventMsg[16] = "Movement Logic!";
 uint8_t count =0;
+char uart_buf[50];
+int uart_buf_len;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_TIM11_Init(void);
+static void MX_TIM5_Init(void);
+static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
-
+void TIM5_Init(void);
+//void TIM5_Interrupt_Init(void);
+//void TIM5_IRQHandler(void);
+//void TIM5_Enable(void);
+//void EventInterrupt_Init(void);
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -70,6 +86,7 @@ static void MX_USART1_UART_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+	uint16_t timer_val;
 
   /* USER CODE END 1 */
 
@@ -92,29 +109,41 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART1_UART_Init();
+  MX_TIM11_Init();
+  MX_TIM5_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_UART_Receive_IT(&huart1,&rxData,1); // Enabling interrupt receive
-  TIM5_Init(); //Set up the timer for the "Data Read" part
-  TIM5_Interrupt_Init(); //Set up the interrupt for it
-  TIM5_Enable(); //Enable the timer
+  //TIM5_Init(); //Set up the timer for the "Data Read" part
+  //HAL_TIM_Base_Start(&htim5);
+  HAL_TIM_Base_Start_IT(&htim5);
+  //TIM5_Interrupt_Init(); //Set up the interrupt for it
+  //TIM5_Enable(); //Enable the timer
+  //EventInterrupt_Init(); //Initialize the event interrupt, correspond to the "Panel Movement" part of the project
+  uart_buf_len = sprintf(uart_buf,"Timer test\r\n");
+  HAL_UART_Transmit(&huart2,(uint8_t *)uart_buf,uart_buf_len,100);
 
-  EventInterrupt_Init(); //Initialize the event interrupt, correspond to the "Panel Movement" part of the project
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /* USER CODE END WHILE */
+	  timer_val = __HAL_TIM_GET_COUNTER(&htim5);
 
+	  HAL_Delay(50);
+
+	  timer_val = __HAL_TIM_GET_COUNTER(&htim5) - timer_val;
+
+	  uart_buf_len = sprintf(uart_buf,"%u us\r\n",timer_val);
+	  HAL_UART_Transmit(&huart2,(uint8_t *)uart_buf,uart_buf_len,100);
+
+	  HAL_Delay(1000);
+	  //	  count++;
+	  //	  HAL_UART_Transmit(&huart2, data, sizeof (data),HAL_MAX_DELAY);
+	  //	  HAL_Delay(1000);
+    /* USER CODE END WHILE */
     /* USER CODE BEGIN 3 */
-	  /*
-	  count++;
-	  if ((count%20) == 0)
-	  {
-		  HAL_UART_Transmit_IT(&huart1, data, sizeof (data));
-	  }
-	  */
   }
   /* USER CODE END 3 */
 }
@@ -161,6 +190,96 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief TIM5 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM5_Init(void)
+{
+
+  /* USER CODE BEGIN TIM5_Init 0 */
+//
+  /* USER CODE END TIM5_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM5_Init 1 */
+//
+  /* USER CODE END TIM5_Init 1 */
+  htim5.Instance = TIM5;
+  htim5.Init.Prescaler = 2 - 1;
+  htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim5.Init.Period = 800 - 1;
+  htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim5, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim5, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM5_Init 2 */
+//
+  /* USER CODE END TIM5_Init 2 */
+
+}
+
+/**
+  * @brief TIM11 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM11_Init(void)
+{
+
+  /* USER CODE BEGIN TIM11_Init 0 */
+
+  /* USER CODE END TIM11_Init 0 */
+
+  TIM_IC_InitTypeDef sConfigIC = {0};
+
+  /* USER CODE BEGIN TIM11_Init 1 */
+
+  /* USER CODE END TIM11_Init 1 */
+  htim11.Instance = TIM11;
+  htim11.Init.Prescaler = 10 - 1;
+  htim11.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim11.Init.Period = 10000 - 1;
+  htim11.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim11.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim11) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_IC_Init(&htim11) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 0;
+  if (HAL_TIM_IC_ConfigChannel(&htim11, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM11_Init 2 */
+
+  /* USER CODE END TIM11_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -194,6 +313,39 @@ static void MX_USART1_UART_Init(void)
 }
 
 /**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 115200;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -206,6 +358,7 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
@@ -223,9 +376,29 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-void TIM5_Init() {
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM5, ENABLE);
+void TIM5_Init(void) {
+	TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+	htim5.Instance = TIM5;
+	htim5.Init.Prescaler = 4294967;
+	htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
+	htim5.Init.Period = 4294967295;
+	htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+	htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+	if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+	sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+	if (HAL_TIMEx_MasterConfigSynchronization(&htim5, &sMasterConfig) != HAL_OK)
+	{
+	  Error_Handler();
+	}
+	/*
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM5, ENABLE);
     TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
+    TIM_HandleTypeDef
 
     TIM_TimeBaseStructure.TIM_Prescaler = 999;  // Assuming a 1 MHz clock
     TIM_TimeBaseStructure.TIM_Period = 9999;    // 10 Hz frequency
@@ -234,9 +407,10 @@ void TIM5_Init() {
     TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
 
     TIM_TimeBaseInit(TIM5, &TIM_TimeBaseStructure);
+    */
 }
-
-void TIM5_Interrupt_Init() {
+/*
+void TIM5_Interrupt_Init(void) {
     NVIC_InitTypeDef NVIC_InitStructure;
 
     NVIC_InitStructure.NVIC_IRQChannel = TIM5_IRQn;  // TIM5_IRQn is defined in the CMSIS file for your STM32F4 variant
@@ -261,12 +435,13 @@ void TIM5_IRQHandler(void) {
     }
 }
 
-void TIM5_Enable() {
+
+void TIM5_Enable(void) {
     TIM_Cmd(TIM5, ENABLE);
     TIM_ITConfig(TIM5, TIM_IT_Update, ENABLE);
 }
 
-void EventInterrupt_Init() {
+void EventInterrupt_Init(void) {
     EXTI_InitTypeDef EXTI_InitStructure;
     NVIC_InitTypeDef NVIC_InitStructure;
 
@@ -294,8 +469,27 @@ void EventInterruptHandler(void) {
     // For this example, we'll print a message.
 	HAL_UART_Transmit_IT(&huart1, eventMsg, sizeof (eventMsg));
 }
+*/
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
+{
 
-
+	uart_buf_len = sprintf(uart_buf,"Interrupt! \r\n");
+	HAL_UART_Transmit(&huart2,(uint8_t *)uart_buf,uart_buf_len,100);
+	//HAL_Delay(1000);
+	//printf("Inside HAL_TIM_PeriodElapsedCallback");
+	if (htim == (&htim5))
+	{
+		uart_buf_len = sprintf(uart_buf,"Its Tim5! \r\n");
+		HAL_UART_Transmit(&huart2,(uint8_t *)uart_buf,uart_buf_len,100);
+		//HAL_Delay(1000);
+		if (count++ >= 5)
+		{
+			//printf("The Counter is %d for the timer 5 interrupt!",count);
+			HAL_UART_Transmit_IT(&huart1, eventMsg, sizeof (eventMsg));
+			//HAL_Delay(1000);
+		}
+	}
+}
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
