@@ -47,17 +47,6 @@ int main(void)
   MX_I2C1_Init();
   MX_USART2_UART_Init();
 
-  //MAGNEOTMETER
-  float xCal, yCal, zCal;
-  xCal = 0;
-  yCal = 0;
-  zCal = 0;
-//  setupMag();
-//  hardIronCal(&xCal, &yCal, &zCal);
-
-  //Direction Angle
-  float direction = 0;
-
   //GPS
   float lat = -1;
   float longi = -1;
@@ -65,11 +54,25 @@ int main(void)
   float date = -1;
   char longiDir = 'x';
   char latDir = 'x';
+
+  for (int i = 0; i < 50; i++) {
+	  getGpsData(&lat, &longi, &time, &date, &longiDir, &latDir);
+  }
+
+  //MAGNEOTMETER
+  float xCal, yCal, zCal;
+  xCal = 0;
+  yCal = 0;
+  zCal = 0;
+  setupMag();
+  hardIronCal(&xCal, &yCal, &zCal);
+
+  //Direction Angle
+  float direction = 0;
+
   while (1)
   {
-//	  direction = magnetometerData(xCal, yCal, zCal);
-	  getGpsData(&lat, &longi, &time, &date, &longiDir, &latDir);
-
+	  direction = magnetometerData(xCal, yCal, zCal);
   }
 }
 
@@ -167,7 +170,7 @@ void getGpsData(float* lat, float* longi, float* time, float* date, char* longDi
 	//Parsing the data and updating our values
 
 	if (strncmp(concatenatedArray, GNRMC, strlen(GNRMC)) == 0) {
-		char* individualGpsData = strtok(gpsDataRx1, ","); // Initialize strtok with the buffer
+		char* individualGpsData = strtok(concatenatedArray, ","); // Initialize strtok with the buffer
 
 		int index = 0;
 
@@ -191,7 +194,7 @@ void getGpsData(float* lat, float* longi, float* time, float* date, char* longDi
 
 	if ((strncmp(gpsDataList[4], minus1, strlen(minus1)) != 0) &&
 	   (strncmp(gpsDataList[4], comma, strlen(comma)) != 0)) {
-		*latDir = (gpsDataList[4]);
+		strcpy(latDir, gpsDataList[4]);
 	}
 
 	if ((strncmp(gpsDataList[5], minus1, strlen(minus1)) != 0) &&
@@ -201,12 +204,12 @@ void getGpsData(float* lat, float* longi, float* time, float* date, char* longDi
 
 	if ((strncmp(gpsDataList[6], minus1, strlen(minus1)) != 0) &&
 	   (strncmp(gpsDataList[6], comma, strlen(comma)) != 0)) {
-		*longDir = gpsDataList[6];
+		strcpy(longDir, gpsDataList[6]);
 	}
 
-	if ((strncmp(gpsDataList[7], minus1, strlen(minus1)) != 0) &&
-	   (strncmp(gpsDataList[7], comma, strlen(comma)) != 0)) {
-		*date = atoi(gpsDataList[7]);
+	if ((strncmp(gpsDataList[8], minus1, strlen(minus1)) != 0) &&
+	   (strncmp(gpsDataList[8], comma, strlen(comma)) != 0)) {
+		*date = atoi(gpsDataList[8]);
 	}
 
 
