@@ -110,7 +110,7 @@ int main(void)
   yCal = 0;
   zCal = 0;
   setupMag();
-//  hardIronCal(&xCal, &yCal, &zCal);
+  hardIronCal(&xCal, &yCal, &zCal);
 
   //Direction Angle
   float direction = 0;
