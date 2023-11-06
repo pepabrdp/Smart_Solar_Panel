@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
 
 double getDayinDecimals(int, double, double, double);
 double getJulianDay(int, int, double);
@@ -136,6 +137,7 @@ struct R4
     double b;
     double c;
 };
+
 
 double getDayinDecimals(int day, double hour, double min, double sec)
 {
@@ -432,7 +434,7 @@ double getHeliocentricLongitude(double L0, double L1, double L2, double L3, doub
     heliocentric_longitude = (heliocentric_longitude * 180) / M_PI;
     heliocentric_longitude = heliocentric_longitude / 360;
     
-    double fraction = heliocentric_longitude - floor(heliocentric_longitude);
+    double fraction = fabs(heliocentric_longitude - floor(abs(heliocentric_longitude)));
     
     if (heliocentric_longitude > 0)
     {
@@ -659,7 +661,7 @@ double getGeocentricLongitude(double heliocentric_longitude)
     double geocentric_longitude = heliocentric_longitude + 180;
     geocentric_longitude = geocentric_longitude / 360;
     
-    double fraction = geocentric_longitude - floor(geocentric_longitude);
+    double fraction = fabs(geocentric_longitude - floor(abs(geocentric_longitude)));
     
     if (geocentric_longitude > 0)
     {
@@ -713,10 +715,274 @@ double getMoonAscendingNode(double julianEphemerisCentury)
     return moon_ascending_node;
 }
 
+double *getNutation(const int Y[63][5], const double abcd[63][4], double JCE, double x0, double x1, double x2, double x3, double x4)
+{
+    double phi = 0;
+    double eps = 0;
+    for (int i = 0; i < 63; i++)
+    {
+        double xySum = x0*Y[i][0] + x1*Y[i][1] + x2*Y[i][2] + x3*Y[i][3] + x4*Y[i][4];
+        xySum = (M_PI/180.0) * xySum;
+        phi += (abcd[i][0] + (abcd[i][1] * JCE)) * sin(xySum);
+        eps += (abcd[i][2] + (abcd[i][3] * JCE)) * cos(xySum);
+    }
+    phi = phi / 36000000;
+    eps = eps / 36000000;
+    
+    double *nutation = malloc(2 * sizeof(double));
+    nutation[0] = phi;
+    nutation[1] = eps;
+
+    return nutation;
+}
+
+double getMeanObliquity(double U)
+{
+    double E = 84381.448 - (4680.93 * U) - (1.55 * pow(U, 2)) + (1999.25 * pow(U, 3)) - (51.38 * pow(U, 4)) - (249.67 * pow(U, 5)) - 
+    (39.05 * pow(U, 6)) + (7.12 * pow(U, 7)) + (27.87 * pow(U, 8)) + (5.79 * pow(U, 9)) + (2.45 * pow(U, 10));
+    
+    return E;
+}
+
+double getApparentSiderealTime(double JD, double JC, double phi, double eps)
+{
+    double mean_siderealTime = 280.46061837 + (360.98564736629 * (JD - 2451545)) + (0.000387933 * pow(JC, 2)) - (pow(JC, 3) / 38710000);
+    
+    mean_siderealTime = mean_siderealTime / 360;
+    double fraction = fabs(mean_siderealTime - floor(abs(mean_siderealTime)));
+    if (mean_siderealTime > 0)
+    {
+        mean_siderealTime = 360 * fraction;
+    }
+    else
+    {
+        mean_siderealTime = 360 - (360 * fraction);
+    }
+    
+    eps = (M_PI / 180.0) * eps;
+    double apparent_siderealTime = mean_siderealTime + (phi * cos(eps));
+    
+    return apparent_siderealTime;
+}
+
+double getSunRightAscension(double lambda, double eps, double beta)
+{
+    lambda = (M_PI / 180.0) * lambda;
+    eps = (M_PI / 180.0) * eps;
+    beta = (M_PI / 180.0) * beta;
+    
+    double alpha = atan2((sin(lambda)*cos(eps)) - (tan(beta)*sin(eps)), cos(lambda));
+    alpha = (alpha * 180) / M_PI;
+    
+    alpha = alpha / 360;
+    double fraction = fabs(alpha - floor(abs(alpha)));
+    if (alpha > 0)
+    {
+        alpha = 360 * fraction;
+    }
+    else
+    {
+        alpha = 360 - (360 * fraction);
+    }
+    
+    return alpha;
+}
+
+double getSunDeclination(double lambda, double eps, double beta)
+{
+    lambda = (M_PI / 180.0) * lambda;
+    eps = (M_PI / 180.0) * eps;
+    beta = (M_PI / 180.0) * beta;
+    
+    double delta = asin((sin(beta)*cos(eps)) + (cos(beta)*sin(eps)*sin(lambda)));
+    delta = (delta * 180) / M_PI;
+    
+    return delta;
+}
+
+double getObserverLocalHourAngle(double v, double sigma, double alpha)
+{
+    double H = v + sigma - alpha;
+    H = H / 360;
+    double fraction = fabs(H - floor(abs(H)));
+    if (H > 0)
+    {
+        H = 360 * fraction;
+    }
+    else
+    {
+        H = 360 - (360 * fraction);
+    }
+    
+    return H;
+}
+
+double getEquatorialHorizontalParallax(double R)
+{
+    double parallax = 8.794 / (3600 * R);
+    
+    return parallax;
+}
+
+double helper_getU(double latitude)
+{
+    double u = atan(0.99664719 * tan(latitude));
+    
+    return u;
+}
+
+double helper_getX(double u, double E, double latitude)
+{
+    u = (M_PI / 180) * u;
+    latitude = (M_PI /  180) * latitude;
+    
+    double x = cos(u) + (E / 6378140)*cos(latitude);
+    
+    return x;
+}
+
+double helper_getY(double u, double E, double latitude)
+{
+    u = (M_PI / 180) * u;
+    latitude = (M_PI /  180) * latitude;
+    
+    double y = 0.99664719*sin(u) + (E / 6378140)*sin(latitude);
+    
+    return y;
+}
+
+double getParallax_SunRightAscension(double x, double eqHorizontal_parallax, double H, double delta)
+{
+    x = (M_PI / 180) * x;
+    eqHorizontal_parallax = (M_PI / 180) * eqHorizontal_parallax;
+    H = (M_PI / 180) * H;
+    delta = (M_PI / 180) * delta;
+    
+    double term1 = -x * sin(eqHorizontal_parallax) * sin(H);
+    double term2 = cos(delta) - (x * sin(eqHorizontal_parallax) * cos(H));
+    
+    double parallax = atan2(term1, term2);
+    parallax = (parallax * 180) / M_PI;
+    
+    return parallax;
+}
+
+double getTopocentricSunRightAscension(double alpha, double parallax)
+{
+    double alpha_dash = alpha + parallax;
+    
+    return alpha_dash;
+}
+
+double getTopocentricSunDeclination(double delta, double y, double x, double eqHorizontal_parallax, double delta_alpha, double H)
+{
+    x = (M_PI / 180) * x;
+    y = (M_PI / 180) * y;
+    eqHorizontal_parallax = (M_PI / 180) * eqHorizontal_parallax;
+    H = (M_PI / 180) * H;
+    delta = (M_PI / 180) * delta;
+    delta_alpha = (M_PI / 180) * delta_alpha;
+    
+    double term1 = (sin(delta) - (y*sin(eqHorizontal_parallax))) * cos(delta_alpha);
+    double term2 = cos(delta) - (x * sin(eqHorizontal_parallax) * cos(H));
+    
+    double delta_dash = atan2(term1, term2);
+    delta_dash = (delta_dash * 180) / M_PI;
+    
+    return delta_dash;
+}
+
+double getTopocentricLocalHourAngle(double H, double alpha_delta)
+{
+    double H_dash = H - alpha_delta;
+    
+    return H_dash;
+}
+
+double getIncompleteElevationAngle(double latitude, double delta_dash, double H_dash)
+{
+    latitude = (M_PI / 180) * latitude;
+    delta_dash = (M_PI / 180) * delta_dash;
+    H_dash = (M_PI / 180) * H_dash;
+    
+    double e0 = asin((sin(latitude)*sin(delta_dash)) + (cos(latitude)*cos(delta_dash)*cos(H_dash)));
+    e0 = (e0 * 180) / M_PI;
+    
+    return e0;
+}
+
+double getAtmosphericRefractionCorrection(double P, double T, double e0)
+{
+    double temp = (M_PI / 180) * (e0 + (10.3 / (e0 + 5.11)));
+    // double temp = e0 + (10.3 / (e0 + 5.11));
+    temp = tan(temp);
+    temp = (temp * 180) / M_PI;
+    
+    double delta_e = (P / 1010) * (283 / (273 + T)) * (1.02 / (60 * temp));
+    
+    return delta_e;
+}
+
+double getTopocentricElevationAngle(double e0, double delta_e)
+{
+    double e = e0 + delta_e;
+    
+    return e;
+}
+
+double getTopocentricZenithAngle(double e)
+{
+    double theta = 90 - e;
+    
+    return theta;
+}
+
+double getTopocentricAzimuthAngle(double H_dash, double latitude, double delta_dash)
+{
+    H_dash = (M_PI / 180) * H_dash;
+    latitude = (M_PI / 180) * latitude;
+    delta_dash = (M_PI / 180) * delta_dash;
+    
+    double temp = (cos(H_dash) * sin(latitude)) - (tan(delta_dash) * cos(latitude));
+    
+    double azimuth = atan2(sin(H_dash), temp);
+    azimuth = (azimuth * 180) / M_PI;
+    
+    azimuth = azimuth / 360;
+    double fraction = fabs(azimuth - floor(abs(azimuth)));
+    if (azimuth > 0)
+    {
+        azimuth = 360 * fraction;
+    }
+    else
+    {
+        azimuth = 360 - (360 * fraction);
+    }
+    
+    azimuth = azimuth + 180;
+    
+    azimuth = azimuth / 360;
+    fraction = fabs(azimuth - floor(abs(azimuth)));
+    if (azimuth > 0)
+    {
+        azimuth = 360 * fraction;
+    }
+    else
+    {
+        azimuth = 360 - (360 * fraction);
+    }
+    
+    return azimuth;
+}
+
 void main()
 {
     int day = 17, year = 2003, month = 10;
     double hour = 19, min = 30, sec = 30;
+    double latitude = 39.742476, longitude = -105.1786;
+    double elevation = 1830.14;
+    double pressure = 820;
+    double temperature = 11;
 
     double day_in_decimal = getDayinDecimals(day, hour, min, sec);
     double julianDay = getJulianDay(year, month, day_in_decimal);
@@ -729,6 +995,7 @@ void main()
     double julianEphemerisCentury = getJulianEphemerisCentury(julianEphemerisDay);
     
     double julianEphemerisMillenium = getJulianEphemerisMillenium(julianEphemerisCentury);
+    printf("Julian Ephemeris Century = %lf\n", julianEphemerisCentury);
     printf("Julian Ephemeris Millenium = %lf\n", julianEphemerisMillenium);
     
     struct L0 *dataL0 = initL0();
@@ -747,13 +1014,7 @@ void main()
 
     double heliocentric_longitude = getHeliocentricLongitude(L0, L1, L2, L3, L4, L5, julianEphemerisMillenium);
     
-    // printf("L0 = %f\n", L0);
-    // printf("L1 = %f\n", L1);
-    // printf("L2 = %f\n", L2);
-    // printf("L3 = %f\n", L3);
-    // printf("L4 = %f\n", L4);
-    // printf("L5 = %f\n", L5);
-    printf("Heliocentric Longitude = %f\n", heliocentric_longitude);
+    printf("Heliocentric Longitude = %lf\n", heliocentric_longitude);
     
     struct B0 *dataB0 = initB0();
     struct B1 *dataB1 = initB1();
@@ -763,9 +1024,7 @@ void main()
     
     double heliocentric_latitude = getHeliocentricLatitude(B0, B1, julianEphemerisMillenium);
     
-    // printf("B0 = %f\n", B0);
-    // printf("B1 = %f\n", B1);
-    printf("Heliocentric Latitude = %f\n", heliocentric_latitude);
+    printf("Heliocentric Latitude = %lf\n", heliocentric_latitude);
     
     struct R0 *dataR0 = initR0();
     struct R1 *dataR1 = initR1();
@@ -781,19 +1040,210 @@ void main()
     
     double earth_radiusVector = getEarthRadiusVector(R0, R1, R2, R3, R4, julianEphemerisMillenium);
     
-    // printf("R0 = %f\n", R0);
-    // printf("R1 = %f\n", R1);
-    // printf("R2 = %f\n", R2);
-    // printf("R3 = %f\n", R3);
-    // printf("R4 = %f\n", R4);
-    printf("Earth Radius Vector = %f\n", earth_radiusVector);
+    printf("Earth Radius Vector = %lf\n", earth_radiusVector);
     
     double geocentric_longitude = getGeocentricLongitude(heliocentric_longitude);
     double geocentric_latitude = -1 * heliocentric_latitude;
     
-    printf("Geocentric Longitude = %f\n", geocentric_longitude);
-    printf("Geoocentric Latitude = %f\n", geocentric_latitude);
+    printf("Geocentric Longitude = %lf\n", geocentric_longitude);
+    printf("Geocentric Latitude = %lf\n", geocentric_latitude);
+    
+    double x0 = getMeanElongation_MoonFromSun(julianEphemerisCentury);
+    double x1 = getMeanAnomalySun(julianEphemerisCentury);
+    double x2 = getMeanAnomalyMoon(julianEphemerisCentury);
+    double x3 = getMoonLatitudeArgument(julianEphemerisCentury);
+    double x4 = getMoonAscendingNode(julianEphemerisCentury);
+    
+    const int Y[63][5] = {
+    {0,0,0,0,1},
+    {-2,0,0,2,2},
+    {0,0,0,2,2},
+    {0,0,0,0,2},
+    {0,1,0,0,0},
+    {0,0,1,0,0},
+    {-2,1,0,2,2},
+    {0,0,0,2,1},
+    {0,0,1,2,2},
+    {-2,-1,0,2,2},
+    {-2,0,1,0,0},
+    {-2,0,0,2,1},
+    {0,0,-1,2,2},
+    {2,0,0,0,0},
+    {0,0,1,0,1},
+    {2,0,-1,2,2},
+    {0,0,-1,0,1},
+    {0,0,1,2,1},
+    {-2,0,2,0,0},
+    {0,0,-2,2,1},
+    {2,0,0,2,2},
+    {0,0,2,2,2},
+    {0,0,2,0,0},
+    {-2,0,1,2,2},
+    {0,0,0,2,0},
+    {-2,0,0,2,0},
+    {0,0,-1,2,1},
+    {0,2,0,0,0},
+    {2,0,-1,0,1},
+    {-2,2,0,2,2},
+    {0,1,0,0,1},
+    {-2,0,1,0,1},
+    {0,-1,0,0,1},
+    {0,0,2,-2,0},
+    {2,0,-1,2,1},
+    {2,0,1,2,2},
+    {0,1,0,2,2},
+    {-2,1,1,0,0},
+    {0,-1,0,2,2},
+    {2,0,0,2,1},
+    {2,0,1,0,0},
+    {-2,0,2,2,2},
+    {-2,0,1,2,1},
+    {2,0,-2,0,1},
+    {2,0,0,0,1},
+    {0,-1,1,0,0},
+    {-2,-1,0,2,1},
+    {-2,0,0,0,1},
+    {0,0,2,2,1},
+    {-2,0,2,0,1},
+    {-2,1,0,2,1},
+    {0,0,1,-2,0},
+    {-1,0,1,0,0},
+    {-2,1,0,0,0},
+    {1,0,0,0,0},
+    {0,0,1,2,0},
+    {0,0,-2,2,2},
+    {-1,-1,1,0,0},
+    {0,1,1,0,0},
+    {0,-1,1,2,2},
+    {2,-1,-1,2,2},
+    {0,0,3,2,2},
+    {2,-1,0,2,2},
+    };
+
+    const double abcd[63][4]={
+    {-171996,-174.2,92025,8.9},
+    {-13187,-1.6,5736,-3.1},
+    {-2274,-0.2,977,-0.5},
+    {2062,0.2,-895,0.5},
+    {1426,-3.4,54,-0.1},
+    {712,0.1,-7,0},
+    {-517,1.2,224,-0.6},
+    {-386,-0.4,200,0},
+    {-301,0,129,-0.1},
+    {217,-0.5,-95,0.3},
+    {-158,0,0,0},
+    {129,0.1,-70,0},
+    {123,0,-53,0},
+    {63,0,0,0},
+    {63,0.1,-33,0},
+    {-59,0,26,0},
+    {-58,-0.1,32,0},
+    {-51,0,27,0},
+    {48,0,0,0},
+    {46,0,-24,0},
+    {-38,0,16,0},
+    {-31,0,13,0},
+    {29,0,0,0},
+    {29,0,-12,0},
+    {26,0,0,0},
+    {-22,0,0,0},
+    {21,0,-10,0},
+    {17,-0.1,0,0},
+    {16,0,-8,0},
+    {-16,0.1,7,0},
+    {-15,0,9,0},
+    {-13,0,7,0},
+    {-12,0,6,0},
+    {11,0,0,0},
+    {-10,0,5,0},
+    {-8,0,3,0},
+    {7,0,-3,0},
+    {-7,0,0,0},
+    {-7,0,3,0},
+    {-7,0,3,0},
+    {6,0,0,0},
+    {6,0,-3,0},
+    {6,0,-3,0},
+    {-6,0,3,0},
+    {-6,0,3,0},
+    {5,0,0,0},
+    {-5,0,3,0},
+    {-5,0,3,0},
+    {-5,0,3,0},
+    {4,0,0,0},
+    {4,0,0,0},
+    {4,0,0,0},
+    {-4,0,0,0},
+    {-4,0,0,0},
+    {-4,0,0,0},
+    {3,0,0,0},
+    {-3,0,0,0},
+    {-3,0,0,0},
+    {-3,0,0,0},
+    {-3,0,0,0},
+    {-3,0,0,0},
+    {-3,0,0,0},
+    {-3,0,0,0},
+    };
+    
+    double *nutation = malloc(2 * sizeof(double));
+    nutation = getNutation(Y, abcd, julianEphemerisCentury, x0, x1, x2, x3, x4);
+    double nutation_longitude = nutation[0];
+    double nutation_obliquity = nutation[1];
+    
+    printf("Nutation Longitude = %lf\n", nutation_longitude);
+    printf("Nutation Obliquity = %lf\n", nutation_obliquity);
+    
+    double mean_obliquity = getMeanObliquity(julianEphemerisMillenium / 10);
+    double true_obliquity = (mean_obliquity / 3600) + nutation_obliquity;
+    
+    printf("True Obliquity = %lf\n", true_obliquity);
+    
+    double aberration_correction = 20.4898 / (3600 * earth_radiusVector);
+    double apparent_sun_longitude = geocentric_longitude + nutation_longitude + aberration_correction;
+    
+    printf("Apparent Sun Longitude = %lf\n", apparent_sun_longitude);
+    
+    double apparent_siderealTime = getApparentSiderealTime(julianDay, julianCentury, nutation_longitude, true_obliquity);
+    double sun_right_ascension = getSunRightAscension(apparent_sun_longitude, true_obliquity, geocentric_latitude);
+    double sun_declination = getSunDeclination(apparent_sun_longitude, true_obliquity, geocentric_latitude);
+ 
+    printf("Geocentric Sun Right Ascension = %lf\n", sun_right_ascension); 
+    printf("Geocentric Sun Declination = %lf\n", sun_declination); 
+    
+    double observer_localHour_angle = getObserverLocalHourAngle(apparent_siderealTime, longitude, sun_right_ascension);
+    
+    printf("Observer Local Hour Angle = %lf\n", observer_localHour_angle);
+    
+    double equatorial_horizontal_parallax = getEquatorialHorizontalParallax(earth_radiusVector);
+    double u = helper_getU(latitude);     
+    double x = helper_getX(u, elevation, latitude);
+    double y = helper_getY(u, elevation, latitude);
+    double parallax_sunright_ascension = getParallax_SunRightAscension(x, equatorial_horizontal_parallax, observer_localHour_angle, sun_declination);
+    double topocentric_sunright_ascension = getTopocentricSunRightAscension(sun_right_ascension, parallax_sunright_ascension);
+    double topcentric_sun_declination = getTopocentricSunDeclination(sun_declination, y, x, equatorial_horizontal_parallax, parallax_sunright_ascension, observer_localHour_angle);
+    double topocentric_local_hour_angle = getTopocentricLocalHourAngle(observer_localHour_angle, parallax_sunright_ascension);
+    
+    printf("Topocentric Sun Right Ascension = %lf\n", topocentric_sunright_ascension);
+    printf("Topocentric Sun Declination = %lf\n", topcentric_sun_declination);
+    printf("Topocentric Local Hour Angle = %lf\n", topocentric_local_hour_angle);
+    
+    double e0 = getIncompleteElevationAngle(latitude, topcentric_sun_declination, topocentric_local_hour_angle);
+    double delta_e = getAtmosphericRefractionCorrection(pressure, temperature, e0);
+    double topocentric_elevation_angle = getTopocentricElevationAngle(e0, delta_e);
+    double topocentric_zenith_angle = getTopocentricZenithAngle(topocentric_elevation_angle);
+    
+    printf("Topocentric Zenith Angle = %lf\n", topocentric_zenith_angle);   
+    
+    double topocentric_azimuth_angle = getTopocentricAzimuthAngle(topocentric_local_hour_angle, latitude, topcentric_sun_declination);
+    
+    printf("Topocentric Azimuth Angle = %lf\n", topocentric_azimuth_angle);
 }
+
+
+
+
+
 
 
 
