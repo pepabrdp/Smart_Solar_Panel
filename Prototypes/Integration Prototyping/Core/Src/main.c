@@ -38,6 +38,23 @@ float getSolarPanelVoltage();
 void setupLightSensor(uint8_t lightAddress);
 float getLightData(uint8_t lightAddress);
 
+//MOTOR CONTROL
+void microDelay (uint16_t delay);
+void setupMotor();
+void turnOffMotor();
+void rotateMotor(float angle);
+void setClockwise();
+void setCounterClockwise();
+
+#define DIR_PIN GPIO_PIN_7
+#define DIR_PORT GPIOA
+#define STEP_PIN GPIO_PIN_6
+#define STEP_PORT GPIOA
+#define SLEEP_PIN GPIO_PIN_8
+#define SLEEP_PORT GPIOA
+#define ENABLE_PIN GPIO_PIN_6
+#define ENABLE_PORT GPIOB
+
 //BLUETOOTH
 void bluetoothSend(float direction, float lightDataGND, float lightDataVDD, float lightDataSDA, float lightDataSCL, float solarPanelVoltage);
 
@@ -68,6 +85,12 @@ uint8_t lightAddressVDD = 0x45;
 uint8_t lightAddressSDA = 0x46;
 uint8_t lightAddressSCL = 0x47;
 ///////////////////////////////////
+//Motor Control
+//Motor Control Variables
+int stepDelay = 500; // 1000us more delay means less speed
+int stepsPerRev = 200;
+float stepAngle = 1.8;
+///////////////////////////////////
 
 int main(void)
 {
@@ -95,6 +118,7 @@ int main(void)
   for (int i = 0; i < 50; i++) {
    getGpsData(&lat, &longi, &time, &date, &longiDir, &latDir);
   }
+
   //////////////////////////////////////////////////////////////
   //LIGHT SENSOR
   setupLightSensor(lightAddressGND);
@@ -110,7 +134,7 @@ int main(void)
   yCal = 0;
   zCal = 0;
   setupMag();
-//  hardIronCal(&xCal, &yCal, &zCal);
+  hardIronCal(&xCal, &yCal, &zCal);
 
   //Direction Angle
   float direction = 0;
@@ -120,6 +144,11 @@ int main(void)
   //SOLAR PANEL VOLTAGE
   float solarPanelVoltage = 0;
   //////////////////////////////////////////////////////////////
+  //MOTOR CONTROL
+  HAL_TIM_Base_Start(&htim1);
+  setCounterClockwise();
+  float motorCounter = 0;
+  ///////////////////////////////////////////////////////////////
 
   int count = 0;
   while (1)
@@ -137,8 +166,53 @@ int main(void)
 
 
     count += 1;
-    HAL_Delay(500);
+
+    if ((HAL_GetTick() - motorCounter) > 5000) {
+	  setupMotor();
+	  rotateMotor(28);
+	  turnOffMotor();
+
+	  motorCounter = HAL_GetTick();
+	}
+
+
   }
+}
+
+void rotateMotor(float angle) {
+
+	int steps = (angle / stepAngle);
+
+	for(int x=0; x < steps; x++)
+	{
+		HAL_GPIO_WritePin(STEP_PORT, STEP_PIN, GPIO_PIN_SET);
+		microDelay(stepDelay);
+		HAL_GPIO_WritePin(STEP_PORT, STEP_PIN, GPIO_PIN_RESET);
+		microDelay(stepDelay);
+	}
+}
+
+void setClockwise() {
+	HAL_GPIO_WritePin(DIR_PORT, DIR_PIN, GPIO_PIN_SET);
+}
+
+void setCounterClockwise() {
+	HAL_GPIO_WritePin(DIR_PORT, DIR_PIN, GPIO_PIN_RESET);
+}
+
+void microDelay (uint16_t delay)
+{
+  __HAL_TIM_SET_COUNTER(&htim1, 0);
+  while (__HAL_TIM_GET_COUNTER(&htim1) < delay);
+}
+
+void setupMotor() {
+	HAL_GPIO_WritePin(SLEEP_PORT, SLEEP_PIN, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(ENABLE_PORT, ENABLE_PIN, GPIO_PIN_RESET);
+}
+
+void turnOffMotor() {
+	HAL_GPIO_WritePin(SLEEP_PORT, SLEEP_PIN, GPIO_PIN_RESET);
 }
 
 void bluetoothSend(float direction, float lightDataGND, float lightDataVDD, float lightDataSDA, float lightDataSCL, float solarPanelVoltage) {
