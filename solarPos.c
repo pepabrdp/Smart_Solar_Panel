@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 double getDayinDecimals(int, double, double, double);
-double getJulianDay(int, int, double);
+double getJulianDay(int, int, double, double);
 double getJulianEphemerisDay(double);
 double getJulianCentury(double);
 double getJulianEphemerisCentury(double);
@@ -150,7 +150,7 @@ double getDayinDecimals(int day, double hour, double min, double sec)
     return day_in_decimal;
 }
 
-double getJulianDay(int year, int month, double day)
+double getJulianDay(int year, int month, double day, double zone)
 {
     if (month == 1 || month == 2)
     {
@@ -161,7 +161,7 @@ double getJulianDay(int year, int month, double day)
     int a = (int)(year / 100);
     int b = 2 - a + (int)(a / 4);
     
-    double julianDay = (int)(365.25 * (year + 4716)) + (int)(30.6001 * (month + 1)) + day + b - 1524.5;
+    double julianDay = (int)(365.25 * (year + 4716)) + (int)(30.6001 * (month + 1)) + day - (zone / 24) + b - 1524.5;
     
     return julianDay;
 }
@@ -977,15 +977,22 @@ double getTopocentricAzimuthAngle(double H_dash, double latitude, double delta_d
 
 void main()
 {
-    int day = 17, year = 2003, month = 10;
-    double hour = 19, min = 30, sec = 30;
-    double latitude = 39.742476, longitude = -105.1786;
-    double elevation = 1830.14;
-    double pressure = 820;
-    double temperature = 11;
+    // int day = 17, year = 2003, month = 10;
+    // double hour = 19, min = 30, sec = 30, zone = 0;
+    // double latitude = 39.742476, longitude = -105.1786;
+    // double elevation = 1830.14;
+    // double pressure = 820;
+    // double temperature = 11;
+    
+    int day = 7, year = 2023, month = 11;
+    double hour = 3, min = 17, sec = 35, zone = 0;
+    double latitude = 40.125, longitude = 105.236944;
+    double elevation = 1655;
+    double pressure = 841.1604;
+    double temperature = 15;
 
     double day_in_decimal = getDayinDecimals(day, hour, min, sec);
-    double julianDay = getJulianDay(year, month, day_in_decimal);
+    double julianDay = getJulianDay(year, month, day_in_decimal, zone);
     printf("Julian Day = %lf\n", julianDay);
     
     double julianEphemerisDay = getJulianEphemerisDay(julianDay);
@@ -1239,6 +1246,18 @@ void main()
     
     printf("Topocentric Azimuth Angle = %lf\n", topocentric_azimuth_angle);
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
