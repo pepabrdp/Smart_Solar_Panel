@@ -45,7 +45,7 @@ TIM_HandleTypeDef htim11;
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
-
+int testNum;
 /* USER CODE BEGIN PV */
 TIM_HandleTypeDef htim5;
 uint8_t rxData;
@@ -67,6 +67,7 @@ static void MX_TIM5_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 void TIM5_Init(void);
+void SendBluetoothData(uint8_t* message);
 //void TIM5_Interrupt_Init(void);
 //void TIM5_IRQHandler(void);
 //void TIM5_Enable(void);
@@ -117,6 +118,7 @@ int main(void)
   //TIM5_Init(); //Set up the timer for the "Data Read" part
   //HAL_TIM_Base_Start(&htim5);
   HAL_TIM_Base_Start_IT(&htim5);
+  HAL_TIM_Base_Start_IT(&htim11);
   //TIM5_Interrupt_Init(); //Set up the interrupt for it
   //TIM5_Enable(); //Enable the timer
   //EventInterrupt_Init(); //Initialize the event interrupt, correspond to the "Panel Movement" part of the project
@@ -129,16 +131,17 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  timer_val = __HAL_TIM_GET_COUNTER(&htim5);
+	  testNum += 1;
+	  //timer_val = __HAL_TIM_GET_COUNTER(&htim5);
 
-	  HAL_Delay(50);
+	  //HAL_Delay(50);
 
-	  timer_val = __HAL_TIM_GET_COUNTER(&htim5) - timer_val;
+	  //timer_val = __HAL_TIM_GET_COUNTER(&htim5) - timer_val;
 
-	  uart_buf_len = sprintf(uart_buf,"%u us\r\n",timer_val);
-	  HAL_UART_Transmit(&huart2,(uint8_t *)uart_buf,uart_buf_len,100);
+	  //uart_buf_len = sprintf(uart_buf,"%u us\r\n",timer_val);
+	  //HAL_UART_Transmit(&huart2,(uint8_t *)uart_buf,uart_buf_len,100);
 
-	  HAL_Delay(1000);
+	  //HAL_Delay(1000);
 	  //	  count++;
 	  //	  HAL_UART_Transmit(&huart2, data, sizeof (data),HAL_MAX_DELAY);
 	  //	  HAL_Delay(1000);
@@ -208,9 +211,9 @@ static void MX_TIM5_Init(void)
 //
   /* USER CODE END TIM5_Init 1 */
   htim5.Instance = TIM5;
-  htim5.Init.Prescaler = 2 - 1;
+  htim5.Init.Prescaler = 160000 -1 ;
   htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim5.Init.Period = 800 - 1;
+  htim5.Init.Period = 10000 - 1;
   htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
@@ -252,9 +255,9 @@ static void MX_TIM11_Init(void)
 
   /* USER CODE END TIM11_Init 1 */
   htim11.Instance = TIM11;
-  htim11.Init.Prescaler = 10 - 1;
+  htim11.Init.Prescaler = 160000 - 1;
   htim11.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim11.Init.Period = 10000 - 1;
+  htim11.Init.Period = 30000 - 1;
   htim11.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim11.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim11) != HAL_OK)
@@ -378,16 +381,17 @@ static void MX_GPIO_Init(void)
 
 void TIM5_Init(void) {
 	TIM_MasterConfigTypeDef sMasterConfig = {0};
+	TIM_ClockConfigTypeDef sClockSourceConfig = {0};
 
 	htim5.Instance = TIM5;
-	htim5.Init.Prescaler = 4294967;
+	htim5.Init.Prescaler = 160000 -1 ;
 	htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
-	htim5.Init.Period = 4294967295;
+	htim5.Init.Period = 10000 - 1;
 	htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-	htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+	htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
 	if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
 	{
-		Error_Handler();
+	  Error_Handler();
 	}
 	sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
 	sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
@@ -395,19 +399,11 @@ void TIM5_Init(void) {
 	{
 	  Error_Handler();
 	}
-	/*
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM5, ENABLE);
-    TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
-    TIM_HandleTypeDef
-
-    TIM_TimeBaseStructure.TIM_Prescaler = 999;  // Assuming a 1 MHz clock
-    TIM_TimeBaseStructure.TIM_Period = 9999;    // 10 Hz frequency
-    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
-    TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
-    TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
-
-    TIM_TimeBaseInit(TIM5, &TIM_TimeBaseStructure);
-    */
+	sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+	if (HAL_TIM_ConfigClockSource(&htim5, &sClockSourceConfig) != HAL_OK)
+	{
+	  Error_Handler();
+	}
 }
 /*
 void TIM5_Interrupt_Init(void) {
@@ -472,7 +468,7 @@ void EventInterruptHandler(void) {
 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 {
-
+	//htim->Instance->SR &= ~1;
 	uart_buf_len = sprintf(uart_buf,"Interrupt! \r\n");
 	HAL_UART_Transmit(&huart2,(uint8_t *)uart_buf,uart_buf_len,100);
 	//HAL_Delay(1000);
@@ -482,14 +478,45 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 		uart_buf_len = sprintf(uart_buf,"Its Tim5! \r\n");
 		HAL_UART_Transmit(&huart2,(uint8_t *)uart_buf,uart_buf_len,100);
 		//HAL_Delay(1000);
-		if (count++ >= 5)
+		if (count++ % 5 == 0)
 		{
-			//printf("The Counter is %d for the timer 5 interrupt!",count);
-			HAL_UART_Transmit_IT(&huart1, eventMsg, sizeof (eventMsg));
-			//HAL_Delay(1000);
+			SendBluetoothData(testNum);
 		}
 	}
+	if (htim == (&htim11))
+		{
+			/*
+			uart_buf_len = sprintf(uart_buf,"Its Tim11! \r\n");
+			HAL_UART_Transmit(&huart2,(uint8_t *)uart_buf,uart_buf_len,100);
+			//HAL_Delay(1000);
+			if (count++ % 5 == 0)
+			{
+				//printf("The Counter is %d for the timer 5 interrupt!",count);
+				HAL_UART_Transmit_IT(&huart1, eventMsg, sizeof (eventMsg));
+				//HAL_Delay(1000);
+			}
+			*/
+		}
 }
+
+
+void SendBluetoothData(uint8_t* message)
+{
+	HAL_UART_Transmit_IT(&huart1,(uint8_t *)"S\n", 8);
+	HAL_Delay(50);
+	HAL_UART_Transmit_IT(&huart1,(uint8_t *)"ADC\n", 16);
+	HAL_Delay(50);
+	HAL_UART_Transmit_IT(&huart1,(uint8_t *)message, sizeof (message));
+	HAL_Delay(50);
+	//SendBluetoothData((testNum & 0x000F));
+	//SendBluetoothData((testNum >> 8 & 0x000F));
+	//SendBluetoothData((testNum >> 16 & 0x000F));
+	//SendBluetoothData((testNum >> 24 & 0x000F));
+	HAL_UART_Transmit_IT(&huart1,(uint8_t *)"E\n", 8);
+	HAL_Delay(50);
+
+}
+
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
@@ -506,6 +533,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		HAL_UART_Receive_IT(&huart1,&rxData,1); // Enabling interrupt receive again
 	}
 }
+
+
+
 
 
 /* USER CODE END 4 */
