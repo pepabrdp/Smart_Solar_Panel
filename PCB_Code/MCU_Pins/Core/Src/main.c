@@ -24,6 +24,11 @@ static void MX_USART1_UART_Init(void);
 ///////////////////////////////////////////////////////////////////////////////
 //FUNCTIONS
 
+//SOLAR ALGORITHM FUNCTIONS
+float calculateAngleAdjustment(float flux1, float flux2);
+float decideAdjustment(float fluxSensor1, float fluxSensor2);
+void lightFollowOnlyMode();
+
 //MAGNETOMETER
 void  hardIronCal(float* xCal, float* yCal, float* zCal);
 float getDirectionAngle(int16_t xMag, int16_t yMag, int16_t zMag, float xCal, float yCal, float zCal);
@@ -141,6 +146,7 @@ int main(void)
 	//////////////////////////////////////////////////////////////
 	//LIGHT SENSOR
 	setupLightSensor(lightAddressGND);
+	setupLightSensor(lightAddressVDD);
 	float lightDataGND = 0;
 	float lightDataVDD = 0;
 	float lightDataSDA = 0;
@@ -164,28 +170,43 @@ int main(void)
 	//////////////////////////////////////////////////////////////
 	//MOTOR CONTROL
 	HAL_TIM_Base_Start(&htim1);
-//	setCounterClockwiseRod(); //up
-	setClockwiseRod(); //down
-	float motorCounter = 0;
 	///////////////////////////////////////////////////////////////
+
+	//If no valid data -> gamer Mode On
+	if (lat == '-1' || longi == '-1' || time == '-1' || date == '-1' ||
+	    longiDir == 'x' || latDir == 'x') {
+		lightFollowOnlyMode();
+	}
 
 	while (1)
 	{
-		if ((HAL_GetTick() - motorCounter) > 1000) {
+
+	}
+}
+
+void lightFollowOnlyMode() {
+	//Later on, if everything's based on interrupts, we deactivate all interrupts
+	int motorCounter = 0;
+	while (1) {
+		if ((HAL_GetTick() - motorCounter) > 500) {
 			HAL_GPIO_WritePin(SMART_PANEL_LED_PORT, SMART_PANEL_LED_PIN, GPIO_PIN_SET);
 			HAL_GPIO_WritePin(DEBUG_LED_PORT, DEBUG_LED_PIN, GPIO_PIN_RESET);
 
-
-			lightDataGND = getLightData(lightAddressGND);
+			float lightDataVDD = getLightData(lightAddressVDD);
+			float lightDataGND = getLightData(lightAddressGND);
 
 			setupMotorRod();
-			if (lightDataGND  > 80) {
-				rotateMotorRod(91);
 
+			if ((lightDataVDD - lightDataGND)  > 100) {
+				setCounterClockwiseRod(); //up
+				rotateMotorRod(721);
+			}
+			else if ((lightDataGND - lightDataVDD) > 100) {
+				setClockwiseRod(); //down
+				rotateMotorRod(721);
 			}
 
 			turnOffMotorRod();
-
 
 			motorCounter = HAL_GetTick();
 		}
@@ -194,6 +215,40 @@ int main(void)
 		HAL_GPIO_WritePin(DEBUG_LED_PORT, DEBUG_LED_PIN, GPIO_PIN_SET);
 	}
 }
+
+float calculateAngleAdjustment(float flux1, float flux2)
+{
+    return ((flux1 / (flux1 + flux2)) * 180) - 90;
+}
+
+float decideAdjustment(float fluxSensor1, float fluxSensor2)
+{
+    // Calculate flux difference
+    float fluxDifference = fabs(fluxSensor1 - fluxSensor2);
+
+
+    // Check if the flux difference is greater than the threshold
+    if (fluxDifference > 50)
+    {
+    	float angleAdjustment = 0;
+        if (fluxSensor1 > fluxSensor2)
+        {
+            // Calculate angle adjustment
+        	angleAdjustment = calculateAngleAdjustment(fluxSensor1, fluxSensor2);
+        }
+        else
+        {
+            // Calculate angle adjustment
+        	angleAdjustment = calculateAngleAdjustment(fluxSensor2, fluxSensor1);
+        }
+        return angleAdjustment;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
 
 ///////////////////////////////////////////////////////////////
 //MOTOR CONTROL
@@ -563,7 +618,7 @@ void hardIronCal(float* xCal, float* yCal, float* zCal) {
   int16_t zMin = magnetometerVal[2];
 
 
-  for (int i = 0; i < 100; i++) {
+  for (int i = 0; i < 200; i++) {
 	while (HAL_I2C_Master_Transmit(&hi2c1, (magAddress << 1), &dataRegister, 1, 20) != HAL_OK){} //send data register address
 	while (HAL_I2C_Master_Receive(&hi2c1, (magAddress << 1 | 1), magnetometerVal, 6, HAL_MAX_DELAY)){}
 
