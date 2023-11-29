@@ -1074,7 +1074,7 @@ void setClockwiseSusan();
 void setCounterClockwiseSusan();
 
 //BLUETOOTH
-void bluetoothSend();
+void bluetoothSend(float voltageMeasured, float direction, float lat, float longi);
 
 #define ROD_DIR_PIN GPIO_PIN_11
 #define ROD_DIR_PORT GPIOC
@@ -1284,11 +1284,11 @@ void lightFollowOnlyMode() {
 
 			if ((lightDataSDA - lightDataSCL)  > 60) {
 				setCounterClockwiseRod(); //up
-				rotateMotorRod(181);
+				rotateMotorRod(361);
 			}
 			else if ((lightDataSCL - lightDataSDA) > 60) {
 				setClockwiseRod(); //down
-				rotateMotorRod(181);
+				rotateMotorRod(361);
 			}
 
 			turnOffMotorRod();
@@ -1299,11 +1299,11 @@ void lightFollowOnlyMode() {
 
 			if ((lightDataGND - lightDataVDD)  > 60) {
 				setCounterClockwiseSusan();
-				rotateMotorSusan(181);
+				rotateMotorSusan(361);
 			}
 			else if ((lightDataVDD - lightDataGND) > 60) {
 				setClockwiseSusan();
-				rotateMotorSusan(181);
+				rotateMotorSusan(361);
 			}
 
 			turnOffMotorSusan();
@@ -1312,8 +1312,8 @@ void lightFollowOnlyMode() {
 
 //			Voltage measurement and sending
 			float solarPanelVoltage = getSolarPanelVoltage();
-			//TODO: bluetoothSend
-			bluetoothSend();
+			bluetoothSend(solarPanelVoltage, -1, -1, -1);
+
 
 			motorCounter = HAL_GetTick();
 		}
@@ -1324,9 +1324,30 @@ void lightFollowOnlyMode() {
 	}
 }
 
-char msg[8] = "Hello";
-void bluetoothSend() {
-	HAL_UART_Transmit_IT(&huart1,msg, sizeof(msg));
+void bluetoothSend(float voltageMeasured, float direction, float lat, float longi) {
+	if (direction == -1 || lat == -1 || longi == -1) {
+		char msg[26];
+		unsigned int voltageMeasuredDecimal = (voltageMeasured - (int)voltageMeasured) * 10000;
+
+		sprintf((char*)msg,"Voltage measured: %.4f\r\n", voltageMeasured);
+
+		HAL_UART_Transmit_IT(&huart1,msg, sizeof(msg));
+	}
+	else {
+		char msg[100];
+		unsigned int voltageMeasuredDecimal = (voltageMeasured - (int)voltageMeasured) * 100;
+		unsigned int directionDecimal = (direction - (int)direction) * 100;
+		unsigned int latDecimal = (lat - (int)lat) * 100;
+		unsigned int longiDecimal = (longi - (int)longi) * 100;
+
+		sprintf((char*)msg,"Voltage measured: %u.%u\r\n | Direction Angle: %u.%u \r\n | Latitude: %u.%u \r\n | Longitude: %u.%u \r\n",
+				(unsigned int)voltageMeasured, (unsigned int) voltageMeasuredDecimal,
+				(unsigned int)direction, (unsigned int) directionDecimal,
+				(unsigned int)lat, (unsigned int) latDecimal,
+				(unsigned int)longi, (unsigned int) longiDecimal);
+
+		HAL_UART_Transmit_IT(&huart1,msg, sizeof(msg));
+	}
 }
 
 ///////////////////////////////////////////////////////////////
@@ -1755,7 +1776,10 @@ float getDirectionAngle(int16_t xMag, int16_t yMag, int16_t zMag, float xCal, fl
   return D;
 }
 
-
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
