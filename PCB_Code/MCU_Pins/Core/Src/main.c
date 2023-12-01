@@ -1042,6 +1042,288 @@ float decideAdjustment(float fluxSensor1, float fluxSensor2)
     }
 }
 
+double *caller(int day, int year, int month, float hour, float min, float sec, float zone, float latitude, float longitude)
+{
+    double elevation = 1655;
+
+    double pressure = 841.1604;
+    double temperature = 15;
+
+    double day_in_decimal = getDayinDecimals(day, hour, min, sec);
+    double julianDay = getJulianDay(year, month, day_in_decimal, zone);
+
+    // printf("Julian Day = %lf\n", julianDay);
+
+    double julianEphemerisDay = getJulianEphemerisDay(julianDay);
+
+    double julianCentury = getJulianCentury(julianDay);
+
+    double julianEphemerisCentury = getJulianEphemerisCentury(julianEphemerisDay);
+
+    double julianEphemerisMillenium = getJulianEphemerisMillenium(julianEphemerisCentury);
+
+    /*
+    printf("Julian Ephemeris Century = %lf\n", julianEphemerisCentury);
+    printf("Julian Ephemeris Millenium = %lf\n", julianEphemerisMillenium);
+    */
+
+    struct L0 *dataL0 = initL0();
+    struct L1 *dataL1 = initL1();
+    struct L2 *dataL2 = initL2();
+    struct L3 *dataL3 = initL3();
+    struct L4 *dataL4 = initL4();
+    struct L5 *dataL5 = initL5();
+
+    double L0 = getL0(dataL0, julianEphemerisMillenium);
+    double L1 = getL1(dataL1, julianEphemerisMillenium);
+    double L2 = getL2(dataL2, julianEphemerisMillenium);
+    double L3 = getL3(dataL3, julianEphemerisMillenium);
+    double L4 = getL4(dataL4, julianEphemerisMillenium);
+    double L5 = getL5(dataL5, julianEphemerisMillenium);
+
+    double heliocentric_longitude = getHeliocentricLongitude(L0, L1, L2, L3, L4, L5, julianEphemerisMillenium);
+
+    // printf("Heliocentric Longitude = %lf\n", heliocentric_longitude);
+
+    struct B0 *dataB0 = initB0();
+    struct B1 *dataB1 = initB1();
+
+    double B0 = getB0(dataB0, julianEphemerisMillenium);
+    double B1 = getB1(dataB1, julianEphemerisMillenium);
+
+    double heliocentric_latitude = getHeliocentricLatitude(B0, B1, julianEphemerisMillenium);
+
+    // printf("Heliocentric Latitude = %lf\n", heliocentric_latitude);
+
+    struct R0 *dataR0 = initR0();
+    struct R1 *dataR1 = initR1();
+    struct R2 *dataR2 = initR2();
+    struct R3 *dataR3 = initR3();
+    struct R4 *dataR4 = initR4();
+
+    double R0 = getR0(dataR0, julianEphemerisMillenium);
+    double R1 = getR1(dataR1, julianEphemerisMillenium);
+    double R2 = getR2(dataR2, julianEphemerisMillenium);
+    double R3 = getR3(dataR3, julianEphemerisMillenium);
+    double R4 = getR4(dataR4, julianEphemerisMillenium);
+
+    double earth_radiusVector = getEarthRadiusVector(R0, R1, R2, R3, R4, julianEphemerisMillenium);
+
+    // printf("Earth Radius Vector = %lf\n", earth_radiusVector);
+
+    double geocentric_longitude = getGeocentricLongitude(heliocentric_longitude);
+    double geocentric_latitude = -1 * heliocentric_latitude;
+
+    /*
+    printf("Geocentric Longitude = %lf\n", geocentric_longitude);
+    printf("Geocentric Latitude = %lf\n", geocentric_latitude);
+    */
+
+    double x0 = getMeanElongation_MoonFromSun(julianEphemerisCentury);
+    double x1 = getMeanAnomalySun(julianEphemerisCentury);
+    double x2 = getMeanAnomalyMoon(julianEphemerisCentury);
+    double x3 = getMoonLatitudeArgument(julianEphemerisCentury);
+    double x4 = getMoonAscendingNode(julianEphemerisCentury);
+
+    const int Y[63][5] = {
+    {0,0,0,0,1},
+    {-2,0,0,2,2},
+    {0,0,0,2,2},
+    {0,0,0,0,2},
+    {0,1,0,0,0},
+    {0,0,1,0,0},
+    {-2,1,0,2,2},
+    {0,0,0,2,1},
+    {0,0,1,2,2},
+    {-2,-1,0,2,2},
+    {-2,0,1,0,0},
+    {-2,0,0,2,1},
+    {0,0,-1,2,2},
+    {2,0,0,0,0},
+    {0,0,1,0,1},
+    {2,0,-1,2,2},
+    {0,0,-1,0,1},
+    {0,0,1,2,1},
+    {-2,0,2,0,0},
+    {0,0,-2,2,1},
+    {2,0,0,2,2},
+    {0,0,2,2,2},
+    {0,0,2,0,0},
+    {-2,0,1,2,2},
+    {0,0,0,2,0},
+    {-2,0,0,2,0},
+    {0,0,-1,2,1},
+    {0,2,0,0,0},
+    {2,0,-1,0,1},
+    {-2,2,0,2,2},
+    {0,1,0,0,1},
+    {-2,0,1,0,1},
+    {0,-1,0,0,1},
+    {0,0,2,-2,0},
+    {2,0,-1,2,1},
+    {2,0,1,2,2},
+    {0,1,0,2,2},
+    {-2,1,1,0,0},
+    {0,-1,0,2,2},
+    {2,0,0,2,1},
+    {2,0,1,0,0},
+    {-2,0,2,2,2},
+    {-2,0,1,2,1},
+    {2,0,-2,0,1},
+    {2,0,0,0,1},
+    {0,-1,1,0,0},
+    {-2,-1,0,2,1},
+    {-2,0,0,0,1},
+    {0,0,2,2,1},
+    {-2,0,2,0,1},
+    {-2,1,0,2,1},
+    {0,0,1,-2,0},
+    {-1,0,1,0,0},
+    {-2,1,0,0,0},
+    {1,0,0,0,0},
+    {0,0,1,2,0},
+    {0,0,-2,2,2},
+    {-1,-1,1,0,0},
+    {0,1,1,0,0},
+    {0,-1,1,2,2},
+    {2,-1,-1,2,2},
+    {0,0,3,2,2},
+    {2,-1,0,2,2},
+    };
+
+    const double abcd[63][4]={
+    {-171996,-174.2,92025,8.9},
+    {-13187,-1.6,5736,-3.1},
+    {-2274,-0.2,977,-0.5},
+    {2062,0.2,-895,0.5},
+    {1426,-3.4,54,-0.1},
+    {712,0.1,-7,0},
+    {-517,1.2,224,-0.6},
+    {-386,-0.4,200,0},
+    {-301,0,129,-0.1},
+    {217,-0.5,-95,0.3},
+    {-158,0,0,0},
+    {129,0.1,-70,0},
+    {123,0,-53,0},
+    {63,0,0,0},
+    {63,0.1,-33,0},
+    {-59,0,26,0},
+    {-58,-0.1,32,0},
+    {-51,0,27,0},
+    {48,0,0,0},
+    {46,0,-24,0},
+    {-38,0,16,0},
+    {-31,0,13,0},
+    {29,0,0,0},
+    {29,0,-12,0},
+    {26,0,0,0},
+    {-22,0,0,0},
+    {21,0,-10,0},
+    {17,-0.1,0,0},
+    {16,0,-8,0},
+    {-16,0.1,7,0},
+    {-15,0,9,0},
+    {-13,0,7,0},
+    {-12,0,6,0},
+    {11,0,0,0},
+    {-10,0,5,0},
+    {-8,0,3,0},
+    {7,0,-3,0},
+    {-7,0,0,0},
+    {-7,0,3,0},
+    {-7,0,3,0},
+    {6,0,0,0},
+    {6,0,-3,0},
+    {6,0,-3,0},
+    {-6,0,3,0},
+    {-6,0,3,0},
+    {5,0,0,0},
+    {-5,0,3,0},
+    {-5,0,3,0},
+    {-5,0,3,0},
+    {4,0,0,0},
+    {4,0,0,0},
+    {4,0,0,0},
+    {-4,0,0,0},
+    {-4,0,0,0},
+    {-4,0,0,0},
+    {3,0,0,0},
+    {-3,0,0,0},
+    {-3,0,0,0},
+    {-3,0,0,0},
+    {-3,0,0,0},
+    {-3,0,0,0},
+    {-3,0,0,0},
+    {-3,0,0,0},
+    };
+
+    double *nutation = malloc(2 * sizeof(double));
+    nutation = getNutation(Y, abcd, julianEphemerisCentury, x0, x1, x2, x3, x4);
+    double nutation_longitude = nutation[0];
+    double nutation_obliquity = nutation[1];
+
+    /*
+    printf("Nutation Longitude = %lf\n", nutation_longitude);
+    printf("Nutation Obliquity = %lf\n", nutation_obliquity);
+    */
+
+    double mean_obliquity = getMeanObliquity(julianEphemerisMillenium / 10);
+    double true_obliquity = (mean_obliquity / 3600) + nutation_obliquity;
+
+    // printf("True Obliquity = %lf\n", true_obliquity);
+
+    double aberration_correction = 20.4898 / (3600 * earth_radiusVector);
+    double apparent_sun_longitude = geocentric_longitude + nutation_longitude + aberration_correction;
+
+    // printf("Apparent Sun Longitude = %lf\n", apparent_sun_longitude);
+
+    double apparent_siderealTime = getApparentSiderealTime(julianDay, julianCentury, nutation_longitude, true_obliquity);
+    double sun_right_ascension = getSunRightAscension(apparent_sun_longitude, true_obliquity, geocentric_latitude);
+    double sun_declination = getSunDeclination(apparent_sun_longitude, true_obliquity, geocentric_latitude);
+
+    /*
+    printf("Geocentric Sun Right Ascension = %lf\n", sun_right_ascension);
+    printf("Geocentric Sun Declination = %lf\n", sun_declination);
+    */
+
+    double observer_localHour_angle = getObserverLocalHourAngle(apparent_siderealTime, longitude, sun_right_ascension);
+
+    // printf("Observer Local Hour Angle = %lf\n", observer_localHour_angle);
+
+    double equatorial_horizontal_parallax = getEquatorialHorizontalParallax(earth_radiusVector);
+    double u = helper_getU(latitude);
+    double x = helper_getX(u, elevation, latitude);
+    double y = helper_getY(u, elevation, latitude);
+    double parallax_sunright_ascension = getParallax_SunRightAscension(x, equatorial_horizontal_parallax, observer_localHour_angle, sun_declination);
+    double topocentric_sunright_ascension = getTopocentricSunRightAscension(sun_right_ascension, parallax_sunright_ascension);
+    double topcentric_sun_declination = getTopocentricSunDeclination(sun_declination, y, x, equatorial_horizontal_parallax, parallax_sunright_ascension, observer_localHour_angle);
+    double topocentric_local_hour_angle = getTopocentricLocalHourAngle(observer_localHour_angle, parallax_sunright_ascension);
+
+    /*
+    printf("Topocentric Sun Right Ascension = %lf\n", topocentric_sunright_ascension);
+    printf("Topocentric Sun Declination = %lf\n", topcentric_sun_declination);
+    printf("Topocentric Local Hour Angle = %lf\n", topocentric_local_hour_angle);
+    */
+
+    double e0 = getIncompleteElevationAngle(latitude, topcentric_sun_declination, topocentric_local_hour_angle);
+    double delta_e = getAtmosphericRefractionCorrection(pressure, temperature, e0);
+    double topocentric_elevation_angle = getTopocentricElevationAngle(e0, delta_e);
+    double topocentric_zenith_angle = getTopocentricZenithAngle(topocentric_elevation_angle);
+
+    // printf("Topocentric Zenith Angle = %lf\n", topocentric_zenith_angle);
+
+    double topocentric_azimuth_angle = getTopocentricAzimuthAngle(topocentric_local_hour_angle, latitude, topcentric_sun_declination);
+
+    // printf("Topocentric Azimuth Angle = %lf\n", topocentric_azimuth_angle);
+
+    double *angles = malloc(2 * sizeof(double));
+    angles[0] = topocentric_zenith_angle;
+    angles[1] = topocentric_azimuth_angle;
+
+    return angles;
+}
+
+
 
 //MAGNETOMETER
 void  hardIronCal(float* xCal, float* yCal, float* zCal);
@@ -1050,7 +1332,7 @@ void setupMag();
 float magnetometerData(float xCal,float yCal,float zCal);
 
 //GPS
-void getGpsData(float* lat, float* longi, float* time, float* date, char* longDir, char* latDir);
+void getGpsData(float* lat, float* longi, int* time, int* date, char* longDir, char* latDir);
 
 //VOLTAGE MEASUREMENT
 float getSolarPanelVoltage();
@@ -1131,6 +1413,7 @@ uint8_t lightAddressSCL = 0x47;
 int stepDelay = 500; // 1000us more delay means less speed
 int stepsPerRev = 200;
 float stepAngle = 1.8;
+int gearRatio = 40;
 ///////////////////////////////////
 
 int main(void)
@@ -1151,10 +1434,10 @@ int main(void)
 	//GPS
 	float lat = -1;
 	float longi = -1;
-	float time = -1;
-	float date = -1;
+	int date = -1;
 	char longiDir = 'x';
 	char latDir = 'x';
+	int time = -1;
 
 	for (int i = 0; i < 50; i++) {
 	 getGpsData(&lat, &longi, &time, &date, &longiDir, &latDir);
@@ -1166,19 +1449,6 @@ int main(void)
 	setupLightSensor(lightAddressVDD);
 	setupLightSensor(lightAddressSDA);
 	setupLightSensor(lightAddressSCL);
-
-	//////////////////////////////////////////////////////////////
-	//MAGNETOMETER
-	float xCal, yCal, zCal;
-	xCal = 0;
-	yCal = 0;
-	zCal = 0;
-//	setupMag();
-//	hardIronCal(&xCal, &yCal, &zCal);
-
-	//Direction Angle
-	float direction = 0;
-//	float direction = magnetometerData(xCal, yCal, zCal);
 
 	//////////////////////////////////////////////////////////////
 	//SOLAR PANEL VOLTAGE
@@ -1195,12 +1465,38 @@ int main(void)
 	    longiDir == 'x' || latDir == 'x') {
 		lightFollowOnlyMode();
 	}
+
 	//////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////
+	//MAGNETOMETER
+	float xCal, yCal, zCal;
+	xCal = 0;
+	yCal = 0;
+	zCal = 0;
+	//TODO: calibration needs to incorporate susan rotation
+	setupMag();
+	hardIronCal(&xCal, &yCal, &zCal);
+
+	//Direction Angle
+	float direction = magnetometerData(xCal, yCal, zCal);
 
 	//Finding Azimuth and Zenith Angles for initialization
 	//TODO: incorporate solar algorithm here to calculate azimuth and zenith angles
-	float azimuthAngle = 0;
-	float zenithAngle = 0;
+	float sec = time % 100;
+	time /= 100;
+	float min = time % 100;
+	time /= 100;
+    float hour = time % 100;
+
+    float year = (date % 100) + 2000;
+    date /= 100;
+    float month = date % 100;
+    date /= 100;
+    float day = date % 100;
+
+	double *angles = caller(day, year, month, hour, min, sec, 0, lat, longi);
+	float zenithAngle = angles[0];
+	float azimuthAngle = angles[1];
 
 	//Rotate to match azimuth angle
 	//TODO:write code to change direction based on it being positive or negative
@@ -1212,13 +1508,13 @@ int main(void)
 	else {
 		setClockwiseSusan();
 	}
-	rotateMotorSusan(rotationSusanAngle);
+	rotateMotorSusan(rotationSusanAngle * gearRatio);
 
 	//TODO: figure out the necessary direction to set here
 	//Have always the same initial state
 	float currentPosition = 90;
 	float newPosition = currentPosition - zenithAngle;
-	rotateMotorRod(newPosition * 10); //multiply by t10 due to gear ratio
+	rotateMotorRod(newPosition * gearRatio); //multiply by t10 due to gear ratio
 	setCounterClockwiseRod(); //up
 
 	int counter = 0;
@@ -1240,7 +1536,7 @@ int main(void)
 			else {
 				setClockwiseSusan();
 			}
-			rotateMotorSusan(rotationSusanAngle);
+			rotateMotorSusan(rotationSusanAngle * gearRatio);
 
 
 
@@ -1258,7 +1554,7 @@ int main(void)
 			else {
 				setClockwiseRod();
 			}
-			rotateMotorRod(rotationRodAngle);
+			rotateMotorRod(rotationRodAngle * gearRatio);
 			currentPosition = newPosition;
 
 			counter = HAL_GetTick();
@@ -1297,11 +1593,11 @@ void lightFollowOnlyMode() {
 			//Figuring our rotational movement
 			setupMotorSusan();
 
-			if ((lightDataGND - lightDataVDD)  > 60) {
+			if ((lightDataVDD - lightDataGND)  > 60) {
 				setCounterClockwiseSusan();
 				rotateMotorSusan(361);
 			}
-			else if ((lightDataVDD - lightDataGND) > 60) {
+			else if ((lightDataGND - lightDataVDD) > 60) {
 				setClockwiseSusan();
 				rotateMotorSusan(361);
 			}
@@ -1463,15 +1759,15 @@ float getSolarPanelVoltage() {
 	HAL_ADC_Stop(&hadc1);
 
 	//Value obtained from voltage divider
-	int voltageDividerLargeRes = 14;
-	float voltageDividerSmallRes = 3.1;
-	float measuredVoltage = (analogValue * 3.1 /  4096);
+	int voltageDividerLargeRes = 13;
+	float voltageDividerSmallRes = 3;
+	float measuredVoltage = (analogValue * 3.3 /  4096);
 	float solarPanelVoltage = (measuredVoltage * (voltageDividerLargeRes + voltageDividerSmallRes) / voltageDividerSmallRes);
 
 	return solarPanelVoltage;
 }
 
-void getGpsData(float* lat, float* longi, float* time, float* date, char* longDir, char* latDir) {
+void getGpsData(float* lat, float* longi, int* time, int* date, char* longDir, char* latDir) {
 	uint8_t gpsDataTx [10] = {0}; //Data to send to GPS module
 	uint8_t gpsDataReady [2] = {0}; //Data to check if gps module ready
 	uint8_t gpsDataRx1 [32] = {0}; //Buffer 1
@@ -1717,40 +2013,60 @@ void hardIronCal(float* xCal, float* yCal, float* zCal) {
   int16_t zMax = magnetometerVal[2];
   int16_t zMin = magnetometerVal[2];
 
+  int i = 0;
+  int motorCounter = 0;
+  while (i != 58) {
 
-  for (int i = 0; i < 200; i++) {
-	while (HAL_I2C_Master_Transmit(&hi2c1, (magAddress << 1), &dataRegister, 1, 20) != HAL_OK){} //send data register address
-	while (HAL_I2C_Master_Receive(&hi2c1, (magAddress << 1 | 1), magnetometerVal, 6, HAL_MAX_DELAY)){}
+		while (HAL_I2C_Master_Transmit(&hi2c1, (magAddress << 1), &dataRegister, 1, 20) != HAL_OK){} //send data register address
+		while (HAL_I2C_Master_Receive(&hi2c1, (magAddress << 1 | 1), magnetometerVal, 6, HAL_MAX_DELAY)){}
 
-    //Updating xMax and xMin
-    if (magnetometerVal[0] > xMax) {
-      xMax = magnetometerVal[0];
-    }
+		//Updating xMax and xMin
+		if (magnetometerVal[0] > xMax) {
+		  xMax = magnetometerVal[0];
+		}
 
-    else if (magnetometerVal[0] < xMin) {
-      xMin = magnetometerVal[0];
-    }
+		else if (magnetometerVal[0] < xMin) {
+		  xMin = magnetometerVal[0];
+		}
 
-    //Updating yMax and yMin
-    if (magnetometerVal[1] > yMax) {
-      yMax = magnetometerVal[1];
-    }
+		//Updating yMax and yMin
+		if (magnetometerVal[1] > yMax) {
+		  yMax = magnetometerVal[1];
+		}
 
-    else if (magnetometerVal[1] < yMin) {
-      yMin = magnetometerVal[1];
-    }
+		else if (magnetometerVal[1] < yMin) {
+		  yMin = magnetometerVal[1];
+		}
 
-    //Updating zMax and zMin
-    if (magnetometerVal[2] > zMax) {
-      zMax = magnetometerVal[2];
-    }
+		//Updating zMax and zMin
+		if (magnetometerVal[2] > zMax) {
+		  zMax = magnetometerVal[2];
+		}
 
-    else if (magnetometerVal[2] < zMin) {
-      zMin = magnetometerVal[2];
-    }
+		else if (magnetometerVal[2] < zMin) {
+		  zMin = magnetometerVal[2];
+		}
 
-    HAL_Delay(250);
-  }
+		if ((HAL_GetTick() - motorCounter) > 1000) {
+			setupMotorSusan();
+			if (i < 18) {
+				setClockwiseSusan();
+				rotateMotorSusan(361);
+			}
+			else if ( i >= 18 && i < 47){
+				setCounterClockwiseSusan();
+				rotateMotorSusan(361);
+			}
+			else {
+				setClockwiseSusan();
+				rotateMotorSusan(361);
+			}
+			turnOffMotorSusan();
+
+			i++;
+			motorCounter = HAL_GetTick();
+		}
+	}
 
   //finding the calibration values
 
@@ -1765,7 +2081,7 @@ float getDirectionAngle(int16_t xMag, int16_t yMag, int16_t zMag, float xCal, fl
   zMag -= zCal;
 
   float D = atan2(xMag, yMag) * (180 / M_PI);
-
+  D -= 55;
   if (D > 360) {
     D -= 360;
   }
