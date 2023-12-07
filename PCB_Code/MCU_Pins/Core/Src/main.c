@@ -463,7 +463,7 @@ double getHeliocentricLongitude(double L0, double L1, double L2, double L3, doub
     heliocentric_longitude = (heliocentric_longitude * 180) / M_PI;
     heliocentric_longitude = heliocentric_longitude / 360;
 
-    double fraction = fabs(heliocentric_longitude - floor(abs(heliocentric_longitude)));
+    double fraction = fabs(heliocentric_longitude - floor(fabs(heliocentric_longitude)));
 
     if (heliocentric_longitude > 0)
     {
@@ -693,7 +693,7 @@ double getGeocentricLongitude(double heliocentric_longitude)
     double geocentric_longitude = heliocentric_longitude + 180;
     geocentric_longitude = geocentric_longitude / 360;
 
-    double fraction = fabs(geocentric_longitude - floor(abs(geocentric_longitude)));
+    double fraction = fabs(geocentric_longitude - floor(fabs(geocentric_longitude)));
 
     if (geocentric_longitude > 0)
     {
@@ -781,7 +781,7 @@ double getApparentSiderealTime(double JD, double JC, double phi, double eps)
     double mean_siderealTime = 280.46061837 + (360.98564736629 * (JD - 2451545)) + (0.000387933 * pow(JC, 2)) - (pow(JC, 3) / 38710000);
 
     mean_siderealTime = mean_siderealTime / 360;
-    double fraction = fabs(mean_siderealTime - floor(abs(mean_siderealTime)));
+    double fraction = fabs(mean_siderealTime - floor(fabs(mean_siderealTime)));
     if (mean_siderealTime > 0)
     {
         mean_siderealTime = 360 * fraction;
@@ -807,7 +807,7 @@ double getSunRightAscension(double lambda, double eps, double beta)
     alpha = (alpha * 180) / M_PI;
 
     alpha = alpha / 360;
-    double fraction = fabs(alpha - floor(abs(alpha)));
+    double fraction = fabs(alpha - floor(fabs(alpha)));
     if (alpha > 0)
     {
         alpha = 360 * fraction;
@@ -837,7 +837,7 @@ double getObserverLocalHourAngle(double v, double sigma, double alpha)
 {
     double H = v + sigma - alpha;
     H = H / 360;
-    double fraction = fabs(H - floor(abs(H)));
+    double fraction = fabs(H - floor(fabs(H)));
     if (H > 0)
     {
         H = 360 * fraction;
@@ -982,7 +982,7 @@ double getTopocentricAzimuthAngle(double H_dash, double latitude, double delta_d
     azimuth = (azimuth * 180) / M_PI;
 
     azimuth = azimuth / 360;
-    double fraction = fabs(azimuth - floor(abs(azimuth)));
+    double fraction = fabs(azimuth - floor(fabs(azimuth)));
     if (azimuth > 0)
     {
         azimuth = 360 * fraction;
@@ -995,7 +995,7 @@ double getTopocentricAzimuthAngle(double H_dash, double latitude, double delta_d
     azimuth = azimuth + 180;
 
     azimuth = azimuth / 360;
-    fraction = fabs(azimuth - floor(abs(azimuth)));
+    fraction = fabs(azimuth - floor(fabs(azimuth)));
     if (azimuth > 0)
     {
         azimuth = 360 * fraction;
@@ -1332,7 +1332,7 @@ void setupMag();
 float magnetometerData(float xCal,float yCal,float zCal);
 
 //GPS
-void getGpsData(float* lat, float* longi, int* time, int* date, char* longDir, char* latDir);
+void getGpsData(int* lat, int* longi, int* time, int* date, char* longDir, char* latDir);
 
 //VOLTAGE MEASUREMENT
 float getSolarPanelVoltage();
@@ -1432,16 +1432,18 @@ int main(void)
 
 	///////////////////////////////////////////////////////////////
 	//GPS
-	float lat = -1;
-	float longi = -1;
+	int lat = -1;
+	int longi = -1;
 	int date = -1;
 	char longiDir = 'x';
 	char latDir = 'x';
 	int time = -1;
 
-	for (int i = 0; i < 50; i++) {
+	for (int i = 0; i < 100; i++) {
 	 getGpsData(&lat, &longi, &time, &date, &longiDir, &latDir);
 	}
+	lat /= 100;
+	longi /= 100;
 
 	//////////////////////////////////////////////////////////////
 	//LIGHT SENSOR
@@ -1461,6 +1463,7 @@ int main(void)
 
 	//////////////////////////////////////////////////////////////
 	//If no valid data -> gamer Mode On
+
 	if (lat == '-1' || longi == '-1' || time == '-1' || date == '-1' ||
 	    longiDir == 'x' || latDir == 'x') {
 		lightFollowOnlyMode();
@@ -1473,20 +1476,18 @@ int main(void)
 	xCal = 0;
 	yCal = 0;
 	zCal = 0;
-	//TODO: calibration needs to incorporate susan rotation
 	setupMag();
 	hardIronCal(&xCal, &yCal, &zCal);
 
-	//Direction Angle
+//	//Direction Angle
 	float direction = magnetometerData(xCal, yCal, zCal);
 
 	//Finding Azimuth and Zenith Angles for initialization
-	//TODO: incorporate solar algorithm here to calculate azimuth and zenith angles
 	float sec = time % 100;
 	time /= 100;
 	float min = time % 100;
 	time /= 100;
-    float hour = time % 100;
+    float hour = (time % 100) + 5;
 
     float year = (date % 100) + 2000;
     date /= 100;
@@ -1494,70 +1495,109 @@ int main(void)
     date /= 100;
     float day = date % 100;
 
+    if (longiDir == 'W') {
+    	longi *= -1;
+    }
+    if (latDir == 'S') {
+    	lat *= -1;
+    }
+
 	double *angles = caller(day, year, month, hour, min, sec, 0, lat, longi);
-	float zenithAngle = angles[0];
-	float azimuthAngle = angles[1];
+	int zenithAngle = ((int)angles[0]) % 90;
+	int azimuthAngle = ((int) angles[1]) % 180;
+
+	solarPanelVoltage = getSolarPanelVoltage();
+	bluetoothSend(solarPanelVoltage, direction, lat, longi);
 
 	//Rotate to match azimuth angle
-	//TODO:write code to change direction based on it being positive or negative
-	float rotationSusanAngle = azimuthAngle - direction;
+
+	int rotationSusanAngle = azimuthAngle - direction;
+	setupMotorSusan();
 	if (rotationSusanAngle < 0) {
 		setCounterClockwiseSusan();
-		rotationSusanAngle *= -1;
+		rotationSusanAngle += 360;
 	}
 	else {
 		setClockwiseSusan();
 	}
 	rotateMotorSusan(rotationSusanAngle * gearRatio);
+	turnOffMotorSusan();
 
-	//TODO: figure out the necessary direction to set here
 	//Have always the same initial state
 	float currentPosition = 90;
-	float newPosition = currentPosition - zenithAngle;
-	rotateMotorRod(newPosition * gearRatio); //multiply by t10 due to gear ratio
-	setCounterClockwiseRod(); //up
+	float rotationRodAngle  = currentPosition - zenithAngle;
+	currentPosition = rotationRodAngle;
+	setupMotorRod();
+	setClockwiseRod();
+	rotateMotorRod(rotationRodAngle * gearRatio); //multiply by t10 due to gear ratio
+	turnOffMotorRod();
 
 	int counter = 0;
 	while (1)
 	{
 		//Adjust every 5 minutes
 		if ((HAL_GetTick() - counter) > 300000) {
-			//Azimuth Angle Change
-			//TODO:write code to change direction based on it being positive or negative
-			//TODO: recalculate azimuth angle
-			direction = magnetometerData(xCal, yCal, zCal);
-			azimuthAngle = 0;
+			for (int i = 0; i < 50; i++) {
+			 getGpsData(&lat, &longi, &time, &date, &longiDir, &latDir);
+			}
+			lat /= 100;
+			longi /= 100;
 
+			if (longiDir == 'W') {
+				longi *= -1;
+			}
+			if (latDir == 'S') {
+				lat *= -1;
+			}
+
+			direction = magnetometerData(xCal, yCal, zCal);
+			sec = time % 100;
+			time /= 100;
+			min = time % 100;
+			time /= 100;
+			hour = time % 100;
+
+			year = (date % 100) + 2000;
+			date /= 100;
+			month = date % 100;
+			date /= 100;
+			day = date % 100;
+
+			angles = caller(day, year, month, hour, min, sec, 0, lat, longi);
+			zenithAngle = ((int) angles[0]) % 90;
+			azimuthAngle = ((int) angles[1]) % 180;
+
+			//Rotate to match azimuth angle
+			setupMotorSusan();
 			float rotationSusanAngle = azimuthAngle - direction;
 			if (rotationSusanAngle < 0) {
 				setCounterClockwiseSusan();
-				rotationSusanAngle *= -1;
+				rotationSusanAngle += 360;
 			}
 			else {
 				setClockwiseSusan();
 			}
 			rotateMotorSusan(rotationSusanAngle * gearRatio);
+			turnOffMotorSusan();
 
-
-
-			//Zenith Angle Change
-			//TODO: figure out the necessary direction to set here
-			//TODO: recalculate zenith angle here
-			zenithAngle = 0;
-			newPosition = 90 - zenithAngle;
-			//TODO: Find the difference between current position and new position
-			float rotationRodAngle = currentPosition - newPosition;
-			if (rotationRodAngle < 0) {
-				setCounterClockwiseRod();
-				rotationRodAngle *= -1;
-			}
-			else {
+			//Have always the same initial state
+			float desiredAngle = 90 - zenithAngle;
+			rotationRodAngle  = currentPosition - desiredAngle;
+			setupMotorRod();
+			if (currentPosition < desiredAngle) {
 				setClockwiseRod();
 			}
-			rotateMotorRod(rotationRodAngle * gearRatio);
-			currentPosition = newPosition;
+			else {
+				setCounterClockwiseRod();
+			}
+			rotateMotorRod(rotationRodAngle * gearRatio); //multiply by t10 due to gear ratio
+			turnOffMotorRod();
+			currentPosition = desiredAngle;
 
 			counter = HAL_GetTick();
+
+			solarPanelVoltage = getSolarPanelVoltage();
+			bluetoothSend(solarPanelVoltage, direction, lat, longi);
 		}
 	}
 }
@@ -1572,7 +1612,6 @@ void lightFollowOnlyMode() {
 
 			float lightDataVDD = getLightData(lightAddressVDD);
 			float lightDataGND = getLightData(lightAddressGND);
-			//TODO: integrate sda and scl light sensors
 			float lightDataSDA = getLightData(lightAddressSDA);
 			float lightDataSCL = getLightData(lightAddressSCL);
 
@@ -1623,26 +1662,30 @@ void lightFollowOnlyMode() {
 void bluetoothSend(float voltageMeasured, float direction, float lat, float longi) {
 	if (direction == -1 || lat == -1 || longi == -1) {
 		char msg[26];
-		unsigned int voltageMeasuredDecimal = (voltageMeasured - (int)voltageMeasured) * 10000;
 
 		sprintf((char*)msg,"Voltage measured: %.4f\r\n", voltageMeasured);
 
 		HAL_UART_Transmit_IT(&huart1,msg, sizeof(msg));
 	}
 	else {
-		char msg[100];
-		unsigned int voltageMeasuredDecimal = (voltageMeasured - (int)voltageMeasured) * 100;
-		unsigned int directionDecimal = (direction - (int)direction) * 100;
-		unsigned int latDecimal = (lat - (int)lat) * 100;
-		unsigned int longiDecimal = (longi - (int)longi) * 100;
+		char msg[26];
 
-		sprintf((char*)msg,"Voltage measured: %u.%u\r\n | Direction Angle: %u.%u \r\n | Latitude: %u.%u \r\n | Longitude: %u.%u \r\n",
-				(unsigned int)voltageMeasured, (unsigned int) voltageMeasuredDecimal,
-				(unsigned int)direction, (unsigned int) directionDecimal,
-				(unsigned int)lat, (unsigned int) latDecimal,
-				(unsigned int)longi, (unsigned int) longiDecimal);
-
+		sprintf((char*)msg,"Voltage measured: %.2f\r\n", voltageMeasured);
 		HAL_UART_Transmit_IT(&huart1,msg, sizeof(msg));
+		microDelay(stepDelay);
+
+		sprintf((char*)msg,"Direction: %.2f\r\n", direction);
+		HAL_UART_Transmit_IT(&huart1,msg, sizeof(msg));
+		microDelay(stepDelay);
+
+		sprintf((char*)msg,"Latitude: %.2f\r\n", lat);
+		HAL_UART_Transmit_IT(&huart1,msg, sizeof(msg));
+		microDelay(stepDelay);
+
+		sprintf((char*)msg,"Longitude: %.2f\r\n", longi);
+		HAL_UART_Transmit_IT(&huart1,msg, sizeof(msg));
+		microDelay(stepDelay);
+
 	}
 }
 
@@ -1767,7 +1810,7 @@ float getSolarPanelVoltage() {
 	return solarPanelVoltage;
 }
 
-void getGpsData(float* lat, float* longi, int* time, int* date, char* longDir, char* latDir) {
+void getGpsData(int* lat, int* longi, int* time, int* date, char* longDir, char* latDir) {
 	uint8_t gpsDataTx [10] = {0}; //Data to send to GPS module
 	uint8_t gpsDataReady [2] = {0}; //Data to check if gps module ready
 	uint8_t gpsDataRx1 [32] = {0}; //Buffer 1
@@ -2015,7 +2058,7 @@ void hardIronCal(float* xCal, float* yCal, float* zCal) {
 
   int i = 0;
   int motorCounter = 0;
-  while (i != 58) {
+  while (i != 54) {
 
 		while (HAL_I2C_Master_Transmit(&hi2c1, (magAddress << 1), &dataRegister, 1, 20) != HAL_OK){} //send data register address
 		while (HAL_I2C_Master_Receive(&hi2c1, (magAddress << 1 | 1), magnetometerVal, 6, HAL_MAX_DELAY)){}
@@ -2049,11 +2092,11 @@ void hardIronCal(float* xCal, float* yCal, float* zCal) {
 
 		if ((HAL_GetTick() - motorCounter) > 1000) {
 			setupMotorSusan();
-			if (i < 18) {
+			if (i < 16) {
 				setClockwiseSusan();
 				rotateMotorSusan(361);
 			}
-			else if ( i >= 18 && i < 47){
+			else if ( i >= 16 && i < 43){
 				setCounterClockwiseSusan();
 				rotateMotorSusan(361);
 			}
